@@ -106,6 +106,179 @@ var (
 	metadataHelp string
 )
 
+var commandHelp = []fs.CommandHelp{{
+	Name:  "query",
+	Short: "List files using Onedrive query language",
+	Long: `This command lists files based on a query
+Please check doc for details: https://learn.microsoft.com/en-us/graph/search-concept-files
+Usage:
+    rclone backend query remote: query fields
+
+fields is optional, multiple fields can write like: "field1,field2"
+`,
+},
+	{
+		Name:  "get-item-details",
+		Short: "Get item details",
+		Long: `This command is to get drive item details
+Usage:
+    rclone backend get-item-details remote: "itemid1" "itemid2"
+`,
+	}}
+
+func appendDriveIdFilter(query string, driveId string) string {
+	if strings.Contains(query, "driveid:") {
+		return query
+	}
+
+	return fmt.Sprintf("%s driveid:%s", query, driveId)
+}
+
+func (f *Fs) query(ctx context.Context, query string, fields []string) (entries interface{}, err error) {
+	rootUrl := graphAPIEndpoint[f.opt.Region]
+	driveId := f.opt.DriveID
+	opts := rest.Opts{
+		Method:  "POST",
+		RootURL: rootUrl,
+		Path:    "/v1.0/search/query",
+	}
+	var request = api.QueryRequest{
+		EntityTypes: []string{"driveItem"},
+		Query: api.QueryString{
+			QueryString: appendDriveIdFilter(query, driveId),
+		},
+		Fields: fields,
+	}
+	var requests = api.QueryRequests{
+		Requests: []api.QueryRequest{request},
+	}
+
+	var queryResponse api.QueryResponse
+	var resp *http.Response
+	err = f.pacer.Call(func() (bool, error) {
+		resp, err = f.srv.CallJSON(ctx, &opts, &requests, &queryResponse)
+		return shouldRetry(ctx, resp, err)
+	})
+	if err != nil {
+		fmt.Printf("...Error %v\n", err)
+		return nil, err
+	}
+
+	// traveling the search result, and return resource's id, name, webUrl
+	theValue := queryResponse.Value
+	if len(theValue) == 0 {
+		return []string{}, nil
+	}
+	hitsContainers := theValue[0].HitsContainers
+	if len(hitsContainers) == 0 {
+		return []string{}, nil
+	}
+	hits := hitsContainers[0].Hits
+	if len(hits) == 0 {
+		return []string{}, nil
+	}
+
+	var result []api.QueryResource
+	for _, hit := range hits {
+		result = append(result, hit.Resource)
+	}
+
+	return &result, nil
+}
+
+func (f *Fs) getItemDetails(ctx context.Context, itemIds []string) (entries interface{}, err error) {
+	var batchReuquests []api.BatchRequest
+	driveId := f.opt.DriveID
+	for _, itemId := range itemIds {
+		url := fmt.Sprintf("/drives/%s/items/%s?$select=webUrl,id,parentReference,name", driveId, itemId)
+		batchReuquests = append(batchReuquests, api.BatchRequest{
+			URL:    url,
+			Method: "GET",
+			ID:     itemId,
+		})
+	}
+
+	opts := rest.Opts{
+		Method:  "POST",
+		RootURL: graphAPIEndpoint[f.opt.Region] + "/v1.0",
+		Path:    "/$batch",
+	}
+	itemDetailsRequest := api.BatchRequests{
+		Requests: batchReuquests,
+	}
+
+	var batchItemResponse api.ItemDetailBatchResponse
+	var resp *http.Response
+	err = f.pacer.Call(func() (bool, error) {
+		resp, err = f.srv.CallJSON(ctx, &opts, &itemDetailsRequest, &batchItemResponse)
+		return shouldRetry(ctx, resp, err)
+	})
+	if err != nil {
+		fmt.Printf("...Error %v\n", err)
+		return nil, err
+	}
+
+	var batchItemResult []api.ItemDetailsResult
+	for _, itemResponse := range batchItemResponse.Responses {
+		var itemResult api.ItemDetailsResult
+
+		itemResult.ID = itemResponse.ID
+		itemResult.Status = itemResponse.Status
+
+		respBody := itemResponse.Body
+		if itemResult.Status == 200 {
+			itemResult.Name = respBody.Name
+			itemResult.WebUrl = respBody.WebURL
+			parentRefPath := respBody.ParentReference["path"]
+			itemResult.Path = strings.SplitN(parentRefPath.(string), ":", 2)[1] + "/" + itemResult.Name
+		} else {
+			itemResult.Error = respBody.Error
+		}
+
+		batchItemResult = append(batchItemResult, itemResult)
+	}
+	return &batchItemResult, nil
+}
+
+func (f *Fs) Command(ctx context.Context, name string, arg []string, opt map[string]string) (out interface{}, err error) {
+	switch name {
+	case "query":
+		var query string
+		var fields []string
+		if len(arg) == 1 {
+			query = strings.Trim(arg[0], "\"")
+		} else if len(arg) == 2 {
+			query = arg[0]
+			fields = strings.Split(strings.Trim(arg[1], "\""), ",")
+		} else {
+			return nil, errors.New("need a query argument")
+		}
+
+		var result, err = f.query(ctx, query, fields)
+		if err != nil {
+			return nil, fmt.Errorf("failed to execute query: %q, error: %w", query, err)
+		}
+
+		return result, nil
+	case "get-item-details":
+		if len(arg) == 0 {
+			return nil, errors.New("need a query argument")
+		}
+
+		var itemIds []string
+		for _, val := range arg {
+			itemIds = append(itemIds, strings.Trim(val, "\""))
+		}
+		var result, err = f.getItemDetails(ctx, itemIds)
+		if err != nil {
+			return nil, fmt.Errorf("failed to execute get-item-details: %q, error: %w", arg, err)
+		}
+		return result, nil
+	default:
+		return nil, fs.ErrorCommandNotFound
+	}
+}
+
 // Register with Fs
 func init() {
 	QuickXorHashType = hash.RegisterHash("quickxor", "QuickXorHash", 40, quickxorhash.New)
@@ -114,6 +287,7 @@ func init() {
 		Description: "Microsoft OneDrive",
 		NewFs:       NewFs,
 		Config:      Config,
+		CommandHelp: commandHelp,
 		MetadataInfo: &fs.MetadataInfo{
 			System: systemMetadataInfo,
 			Help:   metadataHelp,
