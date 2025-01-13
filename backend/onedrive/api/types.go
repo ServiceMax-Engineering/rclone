@@ -612,6 +612,84 @@ type SiteResponse struct {
 	Sites []SiteResource `json:"value"`
 }
 
+// QueryRequests is for "/search/query"
+type QueryString struct {
+	QueryString string `json:"queryString"`
+}
+
+type QueryRequest struct {
+	EntityTypes []string    `json:"entityTypes"`
+	Query       QueryString `json:"query"`
+	Fields      []string    `json:"fields,omitempty"`
+}
+
+type QueryRequests struct {
+	Requests []QueryRequest `json:"requests"`
+}
+
+// QueryRosponse is returned from "/search/query"
+type QueryResource struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	WebUrl string `json:"webUrl"`
+}
+
+type QueryHit struct {
+	Resource QueryResource `json:"resource"`
+}
+
+type QueryHitsContainer struct {
+	Hits []QueryHit `json:"hits"`
+}
+
+type QueryValue struct {
+	HitsContainers []QueryHitsContainer `json:"hitsContainers"`
+}
+
+type QueryResponse struct {
+	Value []QueryValue `json:"value"`
+}
+
+// BatchRequest is for "/v1.0/$batch"
+type BatchRequest struct {
+	URL    string `json:"url"`
+	Method string `json:"method"`
+	ID     string `json:"id"`
+}
+
+type BatchRequests struct {
+	Requests []BatchRequest `json:"requests"`
+}
+
+// Batch Reponse for file details
+type ItemDetailResponseBody struct {
+	ID              string                 `json:"id,omitempty"`
+	Name            string                 `json:"name,omitempty"`
+	WebURL          string                 `json:"webUrl,omitempty"`
+	Error           map[string]interface{} `json:"error,omitempty"`
+	ParentReference map[string]interface{} `json:"parentReference,omitempty"`
+}
+
+type ItemDetailResponse struct {
+	ID     string                 `json:"id"`
+	Status int                    `json:"status"`
+	Body   ItemDetailResponseBody `json:"body"`
+}
+
+type ItemDetailBatchResponse struct {
+	Responses []ItemDetailResponse `json:"responses"`
+}
+
+// GetFileDetails Result
+type ItemDetailsResult struct {
+	ID     string      `json:"id"`
+	Name   string      `json:"name,omitempty"`
+	Path   string      `json:"path,omitempty"`
+	WebUrl string      `json:"webUrl,omitempty"`
+	Status int         `json:"status"`
+	Error  interface{} `json:"error,omitempty"`
+}
+
 // GetGrantedTo returns the GrantedTo property.
 // This is to get around the odd problem of
 // GrantedTo being deprecated on OneDrive Business, while
