@@ -19,7 +19,10 @@ COPY --from=builder /go/src/github.com/rclone/rclone/rclone /usr/local/bin/
 
 RUN addgroup -g 1009 rclone && adduser -u 1009 -Ds /bin/sh -G rclone rclone
 
-ENTRYPOINT [ "rclone" ]
-
 WORKDIR /data
 ENV XDG_CONFIG_HOME=/config
+
+COPY --from=builder /go/src/github.com/rclone/rclone/startup.sh /home/rclone
+RUN chmod 755 /home/rclone/startup.sh
+
+CMD ["sh","/home/rclone/startup.sh"]
