@@ -663,11 +663,12 @@ type BatchRequests struct {
 
 // Batch Reponse for file details
 type ItemDetailResponseBody struct {
-	ID              string                 `json:"id,omitempty"`
-	Name            string                 `json:"name,omitempty"`
-	WebURL          string                 `json:"webUrl,omitempty"`
-	Error           map[string]interface{} `json:"error,omitempty"`
-	ParentReference map[string]interface{} `json:"parentReference,omitempty"`
+	ID                   string                 `json:"id,omitempty"`
+	Name                 string                 `json:"name,omitempty"`
+	WebURL               string                 `json:"webUrl,omitempty"`
+	LastModifiedDateTime string                 `json:"lastModifiedDateTime,omitempty"`
+	Error                map[string]interface{} `json:"error,omitempty"`
+	ParentReference      map[string]interface{} `json:"parentReference,omitempty"`
 }
 
 type ItemDetailResponse struct {
@@ -682,12 +683,13 @@ type ItemDetailBatchResponse struct {
 
 // GetFileDetails Result
 type ItemDetailsResult struct {
-	ID     string      `json:"id"`
-	Name   string      `json:"name,omitempty"`
-	Path   string      `json:"path,omitempty"`
-	WebUrl string      `json:"webUrl,omitempty"`
-	Status int         `json:"status"`
-	Error  interface{} `json:"error,omitempty"`
+	ID                   string      `json:"id"`
+	Name                 string      `json:"name,omitempty"`
+	Path                 string      `json:"path,omitempty"`
+	WebUrl               string      `json:"webUrl,omitempty"`
+	LastModifiedDateTime string      `json:"lastModifiedDateTime,omitempty"`
+	Status               int         `json:"status"`
+	Error                interface{} `json:"error,omitempty"`
 }
 
 // GetGrantedTo returns the GrantedTo property.

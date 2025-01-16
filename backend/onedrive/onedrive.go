@@ -190,7 +190,7 @@ func (f *Fs) getItemDetails(ctx context.Context, itemIds []string) (entries inte
 	var batchReuquests []api.BatchRequest
 	driveId := f.opt.DriveID
 	for _, itemId := range itemIds {
-		url := fmt.Sprintf("/drives/%s/items/%s?$select=webUrl,id,parentReference,name", driveId, itemId)
+		url := fmt.Sprintf("/drives/%s/items/%s?$select=webUrl,id,parentReference,name,lastModifiedDateTime", driveId, itemId)
 		batchReuquests = append(batchReuquests, api.BatchRequest{
 			URL:    url,
 			Method: "GET",
@@ -229,6 +229,7 @@ func (f *Fs) getItemDetails(ctx context.Context, itemIds []string) (entries inte
 		if itemResult.Status == 200 {
 			itemResult.Name = respBody.Name
 			itemResult.WebUrl = respBody.WebURL
+			itemResult.LastModifiedDateTime = respBody.LastModifiedDateTime
 			parentRefPath := respBody.ParentReference["path"]
 			itemResult.Path = strings.SplitN(parentRefPath.(string), ":", 2)[1] + "/" + itemResult.Name
 		} else {
